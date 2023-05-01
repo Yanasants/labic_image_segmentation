@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Created on Fri Apr 14 19:04:14 2023
 
@@ -13,15 +14,16 @@ from tensorflow import keras
 
 import tensorflow as tf
 
+#from keras.callbacks.callbacks import EarlyStopping
 from keras.preprocessing.image import ImageDataGenerator
 
 import numpy as np
-import matplotlib.pyplot as plt
-
 import glob
 import time
 import random
 import datetime
+import pandas as pd
+import plotly.graph_objects as go
 
 from sklearn.model_selection import train_test_split
 
@@ -170,25 +172,32 @@ class DataAugmentation:
 
 
 class SegmentationModel:
-    def __init__(self, N, backbone_name, trainDS, valDS, epochs):
+    def __init__(self, N, backbone_name, trainDS, valDS, epochs, callback=None):
         self.N = N
         self.backbone_name = backbone_name
         self.trainDS, self.valDS = trainDS, valDS
         self.epochs = epochs
+        self.callback = callback
         self.model = None
         self.history = None
         self.model, self.history = self.generate_model()
 
     def generate_model(self):
-        model = Unet(backbone_name=self.backbone_name, encoder_weights=None,
+        model = Linknet(backbone_name=self.backbone_name, encoder_weights=None,
                     input_shape=(None,None,self.N))
 
 
         model.compile(optimizer=Adam(), loss=bce_jaccard_loss, metrics=[iou_score]) 
 
-        history = model.fit(self.trainDS, 
-                epochs=self.epochs, 
+        if self.callback == None:
+            history = model.fit(self.trainDS, 
+                    epochs=self.epochs, 
+                    validation_data=self.valDS)
+        else:
+            history = model.fit(self.trainDS, 
+                epochs=self.epochs, callbacks=self.callback,
                 validation_data=self.valDS)
+            
         return model, history
 
 
@@ -196,7 +205,7 @@ class SegmentationModel:
 
     
 class SaveReport:
-    def __init__(self, model, history, folder_name, n_fold,epochs, use_batch_size=4):
+    def __init__(self, model, history, folder_name, n_fold,epochs, exec_folder_name, use_batch_size=4):
         self.folder_name = folder_name
         self.n_fold = n_fold
         self.epochs = epochs
@@ -205,7 +214,7 @@ class SaveReport:
         self.history = history
 
         self.dir_predict = None
-        self.exec_folder_name = None
+        self.exec_folder_name = exec_folder_name
         self.save_model()
 
         
@@ -224,7 +233,7 @@ class SaveReport:
             self.output_folder = f"/outputs/Exec_{exec_moment}"
             self.exec_folder_name = f"{self.folder_name}{self.output_folder}"
         else:
-            self.exec_folder_name = input("Diretório para report: ")
+            # self.exec_folder_name = input("Diretório para report: ")
             self.output_folder= f"/outputs/{self.exec_folder_name}"
             self.exec_folder_name = f"{self.folder_name}{self.output_folder}"
             exec_moment = self.exec_folder_name.split('/')[-1].split('_')[1]
@@ -242,6 +251,11 @@ class SaveReport:
         self.model.save(self.model_name)
         np.save(self.n_fold_folder_name + '/history_%i.npy'%self.n_fold, self.history.history)
         print(f"\nModelo salvo.\nNome: {self.name_file}\nSalvo em: {exec_folder_name}")
+
+    def save_history_txt(self):
+        with open(f"{self.n_fold_folder_name }/history_{self.n_fold}.txt", "w") as file:
+            file.write(str(self.history.history))
+        print(f"Arquivo history_{self.n_fold}.txt salvo com sucesso.")
         
 
 class PredictImages:
@@ -281,6 +295,7 @@ class DiceCoef(Dataset):
 
         self.dice = self.dice_coef(y_true=self.gt_imgs, y_pred=self.pred_imgs)
         print(f"Coeficiente Dice: {self.dice}")
+        self.df = None
 
     def dice_coef(self, y_true, y_pred):
         y_true_f = keras.backend.flatten(y_true) 
@@ -292,3 +307,40 @@ class DiceCoef(Dataset):
     def save_dice(self, adress):
         with open(adress, "w") as file:
             file.write(f"Dice: {self.dice}")
+
+    def generate_csv_dice(self, n_all_folders, save_report, title):
+        all_dice = []
+        for i in range(n_all_folders+1):
+            with open(f"{save_report.exec_folder_name}/fold_{i}/dice_fold_{i}.txt", "r") as file:
+                content = file.read()
+                dice = float(content[6:])
+                all_dice.append(dice)
+        index = [n for n in range(n_all_folders+1)] + ['Mean','Std-Dev', 'Median', 'Max', 'Min']
+        values = all_dice + [np.average(all_dice), np.std(all_dice), np.median(all_dice), np.max(all_dice), np.min(all_dice)]
+        all_dice_dict = {"Index":index, title:values}
+        self.df = pd.DataFrame(all_dice_dict)
+        self.df.to_csv(f"{save_report.exec_folder_name}/{title}.csv")
+        print(f"Arquivo {title}.csv gerado com sucesso.")
+
+    def generate_graphic(self, epochs, segment, save_report):
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x = [epoch for epoch in range(epochs)], y = segment.history.history['iou_score'],
+                        mode = 'lines', name = "Train Iou Score", line = {'color': '#1D6DD8'}))
+
+        fig.add_trace(go.Scatter(x = [epoch for epoch in range(epochs)], y = segment.history.history['loss'],
+                        mode = 'lines', name = "Train Loss", line = {'color': '#D65200'}))
+
+        fig.add_trace(go.Scatter(x = [epoch for epoch in range(epochs)], y = segment.history.history['val_iou_score'],
+                        mode = 'lines', name = "Validation Iou Score", line = {'color': '#00AD5A'}))
+
+        fig.add_trace(go.Scatter(x = [epoch for epoch in range(epochs)], y = segment.history.history['val_loss'],
+                        mode = 'lines', name = "Validation Loss", line = {'color': '#B40808'}))
+
+        fig.update_layout(title_text='Performance Report', title_x=0.5,\
+                        xaxis_title='Epochs', yaxis_title='Values',\
+                        height = 450, width = 800, font={'size':10})
+        fig.show()
+        fig.write_image(f"{save_report.n_fold_folder_name}/performance_report.png")
+
+
+
