@@ -233,7 +233,6 @@ class SaveReport:
             self.output_folder = f"/outputs/Exec_{exec_moment}"
             self.exec_folder_name = f"{self.folder_name}{self.output_folder}"
         else:
-            # self.exec_folder_name = input("Diretório para report: ")
             self.output_folder= f"/outputs/{self.exec_folder_name}"
             self.exec_folder_name = f"{self.folder_name}{self.output_folder}"
             exec_moment = self.exec_folder_name.split('/')[-1].split('_')[1]
@@ -249,13 +248,15 @@ class SaveReport:
         self.name_file = "model_"+ str(self.use_batch_size) + "_" + str(self.epochs) + "_exec_%s"%(exec_moment) + "_fold_%i"%self.n_fold
         self.model_name = self.n_fold_folder_name + '/%s.h5'%self.name_file
         self.model.save(self.model_name)
-        np.save(self.n_fold_folder_name + '/history_%i.npy'%self.n_fold, self.history.history)
         print(f"\nModelo salvo.\nNome: {self.name_file}\nSalvo em: {exec_folder_name}")
 
-    def save_history_txt(self):
-        with open(f"{self.n_fold_folder_name }/history_{self.n_fold}.txt", "w") as file:
+    def save_history(self):
+        with open(f"{self.n_fold_folder_name}/history_{self.n_fold}.txt", "w") as file:
             file.write(str(self.history.history))
-        print(f"Arquivo history_{self.n_fold}.txt salvo com sucesso.")
+
+        df = pd.DataFrame(self.history.history)
+        df.to_csv(f"{self.n_fold_folder_name}/history_{self.n_fold}.csv")
+        print(f"Arquivos history_{self.n_fold}.csv/txt salvos com sucesso.")
         
 
 class PredictImages:
@@ -322,25 +323,33 @@ class DiceCoef(Dataset):
         self.df.to_csv(f"{save_report.exec_folder_name}/{title}.csv")
         print(f"Arquivo {title}.csv gerado com sucesso.")
 
-    def generate_graphic(self, epochs, segment, save_report):
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x = [epoch for epoch in range(epochs)], y = segment.history.history['iou_score'],
-                        mode = 'lines', name = "Train Iou Score", line = {'color': '#1D6DD8'}))
-
-        fig.add_trace(go.Scatter(x = [epoch for epoch in range(epochs)], y = segment.history.history['loss'],
-                        mode = 'lines', name = "Train Loss", line = {'color': '#D65200'}))
-
-        fig.add_trace(go.Scatter(x = [epoch for epoch in range(epochs)], y = segment.history.history['val_iou_score'],
+    def generate_graphic(self, epochs, segment, save_report, graph_type):
+        if graph_type=="iou_score":
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x = [epoch for epoch in range(epochs)], y = segment.history.history['val_iou_score'],
                         mode = 'lines', name = "Validation Iou Score", line = {'color': '#00AD5A'}))
+            fig.add_trace(go.Scatter(x = [epoch for epoch in range(epochs)], y = segment.history.history['iou_score'],
+                            mode = 'lines', name = "Train Iou Score", line = {'color': '#1D6DD8'}))
+            
+            fig.update_layout(title_text='Iou Score per Epoch', title_x=0.5,\
+                            xaxis_title='Epochs', yaxis_title='Iou Score',\
+                            height = 450, width = 800, font={'size':10})
+            fig.show()
+            fig.write_image(f"{save_report.n_fold_folder_name}/iou_score_report.png")
 
-        fig.add_trace(go.Scatter(x = [epoch for epoch in range(epochs)], y = segment.history.history['val_loss'],
-                        mode = 'lines', name = "Validation Loss", line = {'color': '#B40808'}))
+        if graph_type=="loss":
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x = [epoch for epoch in range(epochs)], y = segment.history.history['loss'],
+                            mode = 'lines', name = "Train Loss", line = {'color': '#D65200'}))
 
-        fig.update_layout(title_text='Performance Report', title_x=0.5,\
-                        xaxis_title='Epochs', yaxis_title='Values',\
-                        height = 450, width = 800, font={'size':10})
-        fig.show()
-        fig.write_image(f"{save_report.n_fold_folder_name}/performance_report.png")
+            fig.add_trace(go.Scatter(x = [epoch for epoch in range(epochs)], y = segment.history.history['val_loss'],
+                            mode = 'lines', name = "Validation Loss", line = {'color': '#B40808'}))
+            
+            fig.update_layout(title_text='Loss per Epoch', title_x=0.5,\
+                            xaxis_title='Epochs', yaxis_title='Loss',\
+                            height = 450, width = 800, font={'size':10})
+            fig.show()
+            fig.write_image(f"{save_report.n_fold_folder_name}/loss_report.png")
 
 
 
