@@ -38,26 +38,68 @@ from tensorflow.data import AUTOTUNE
 from tensorflow.keras.optimizers import Adam
 
 class Dataset:
-    def __init__(self, folder:str, norm_imgs_folder:str, gt_folder:str, ORIGINAL_SIZE=None, NEW_SIZE=None, X=None, Y=None):
+    def __init__(self, folder:str, norm_imgs_folder:str, gt_folder:str, ORIGINAL_SIZE=None, NEW_SIZE=None):
+        '''
+        Construtor da classe Dataset.
+        Após a inicialização, teremos:
+            - No atributo X: todas as imagens;
+            - No atributo Y: todas as máscaras;
+
+        :param folder: Diretório onde se encontra os subdiretórios com imagens e com as máscaras.
+        :type folder: str
+        :param norm_imgs_folder: Subdiretório com as imagens.
+        :type norm_imgs_folder: str
+        :param gt_folder: Subdiretório com as máscaras.
+        :type gt_folder: str
+        :param ORIGINAL_SIZE: Size original das imagens.
+        :type ORIGINAL_SIZE: int
+        :param NEW_SIZE: Novo size das imagens.
+        :type NEW_SIZE: int
+
+        '''
         self.folder = folder
         self.norm_imgs_folder = norm_imgs_folder
         self.gt_folder = gt_folder
         self.ORIGINAL_SIZE = ORIGINAL_SIZE
         self.NEW_SIZE = NEW_SIZE
-        self.X = X
-        self.Y = Y
+        self.X = None
+        self.Y = None
         self.X_train, self.X_val, self.Y_train, self.Y_val = (None, None, None, None)
         self.img_shape = None
         self.norm_imgs, self.GT_imgs = None, None
         self.load_images()
 
-    def resize_one_img(self, img, width, height):
+    def resize_one_img(self, img: np.ndarray, width:int, height:int):
+        '''
+        Redimensiona uma imagem.
+
+        :param img: Imagem original.
+        :type img: numpy.ndarray
+        :param width: Nova largura da imagem.
+        :type width: int
+        :param height: Nova altura da imagem.
+        :type width: int
+        :return: Imagem redimensionada.
+        :rtype: numpy.ndarray
+
+        '''
         self.curr_img = cv2.resize(img, (width, height))
         return self.curr_img
         
-    def load_images_array(self, img_list, original_size=160, new_size = None):
+    def load_images_array(self, img_list:list, original_size=160, new_size = None):
+
         '''
-        Recebe um glob das imagens e converte em um numpy array no formato que o Keras aceita
+        Recebe um glob das imagens e converte em um numpy array no formato que o Keras aceita.
+
+        :param img_list: Lista com todos os nomes das imagens no diretório. 
+        :type img_list: list
+        :param new_size: Novo size da imagem (equivalendo para largura e altura).
+        :type new_size: int
+
+        :return: Conjunto de imagens no formato de input do Keras [(exemplo formato Keras: (5, 256, 256, 1)] 
+        e uma tupla com a altura e a largura, respectivamente, da imagem original.
+        :rtype: tuple
+
         '''
         img = np.zeros((len(img_list), new_size, new_size), dtype=float)
         img_shape = img_as_float(io.imread(img_list[0])).shape
@@ -73,6 +115,11 @@ class Dataset:
         
     def load_images(self):
 
+        '''
+        Organiza a lista das imagens no diretório e chama a função load_images_array para alimentar 
+        os atributos X, Y e img_shape da classe.        
+        '''
+
         self.norm_imgs = sorted(glob.glob(f"{self.folder}{self.norm_imgs_folder}")) 
         self.GT_imgs = sorted(glob.glob(f"{self.folder}{self.gt_folder}")) 
                                         
@@ -86,6 +133,19 @@ class Dataset:
     
     def split_dataset(self, seed_min=0, seed_max =2**20, test_size=0.2):
 
+        '''
+        Separa as imagens e as máscaras de treino e validação.
+        Alimenta os atributos X_train, Y_train, X_val e Y_val.
+
+        :param seed_min: Valor mínimo para a semente do random. 
+        :type seed_min: int
+        :param seed_max: Novo size da imagem (equivalendo para largura e altura).
+        :type seed_max: int
+        :param test_size: Tamanho do conjunto de teste [Valores entre 0 e 1. Ex.: 0.2 = 20% do total dos dados para teste]. 
+        :type test_size: float
+
+        '''
+
         random.seed(time.time())
         SEED_1 = random.randint(seed_min, seed_max)
 
@@ -95,7 +155,34 @@ class Dataset:
         
     
 class DataAugmentation:
-    def __init__(self, X_train, Y_train, use_batch_size, X_val, Y_val, factor=0.2, direction="horizontal", rotation=0.1):
+    def __init__(self, X_train:np.ndarray, Y_train:np.ndarray, use_batch_size:int, X_val:np.ndarray, \
+                 Y_val:np.ndarray, factor=0.2, direction="horizontal", rotation=0.1):
+        '''
+        Construtor da classe DataAugmentation.
+        Após a inicialização, teremos:
+            - No atributo trainDS: dados de treino após o processo de data augmentation;
+            - No atributo valDS: dados de validação após o processo de data augmentation;;
+
+        :param X_train: Imagens de treino.
+        :type X_train: numpy.ndarray
+        :param Y_train: Máscaras de treino.
+        :type Y_train: numpy.ndarray
+
+        :param X_val: Imagens de validação.
+        :type X_val: numpy.ndarray
+        :param Y_val: Máscaras de validação.
+        :type Y_val: numpy.ndarray
+
+        :param use_batch_size: Tamanho do pacote (batch-size).
+        :type use_batch_size: int
+        :param factor: Fator para ajuste no data augmentation. 
+        :type factor: float
+        :param direction: Direção ("horizontal", "vertical") do ajuste no data augmentation.
+        :type direction: str
+        :param rotation: Ângulo de rotação das imagens no data augmentation.
+        :type rotation: int
+
+        '''
         self.trainAug = None
         self.valAug = None
 
@@ -110,8 +197,12 @@ class DataAugmentation:
         self.valDS = None
         self.trainDS, self.valDS = self.augmentation()
         
-    @tf.autograph.experimental.do_not_convert
+    @tf.autograph.experimental.do_not_convert # Evita warnings
     def augmentation(self):
+
+        '''
+        Aplica o processo de data augmentation de acordo com os parâmetros repassados.
+        '''
 
         self.trainAug = Sequential([
             #preprocessing.Rescaling(scale=1.0 / 255),
@@ -143,10 +234,6 @@ class DataAugmentation:
         seed_max = 2**20
         SEED_2 = random.randint(seed_min, seed_max)
 
-        self.image_generator = self.image_datagen.flow(self.X_train, self.Y_train,
-        batch_size=self.use_batch_size,
-        seed=SEED_2)
-
         # Data Augmentation 2 - 2022.05.07 Fazendo DA no conj de valid
         self.trainDS = tf.data.Dataset.from_tensor_slices((self.X_train, self.Y_train))
         self.trainDS = self.trainDS.repeat(3)
@@ -172,7 +259,27 @@ class DataAugmentation:
 
 
 class SegmentationModel:
-    def __init__(self, N, backbone_name, trainDS, valDS, epochs, callback=None):
+    def __init__(self, N:int, backbone_name:str, trainDS, valDS, epochs:int, callback=None):
+        '''
+        Construtor da classe SegmentationModel.
+        Após a inicialização, teremos:
+            - No atributo model: Modelo da rede;
+            - No atributo history: Report do treinamento;
+
+        :param N: Número de canais (precisa ser 3 ser enconder_weights != None).
+        :type N: int
+        :param backbone_name: Backbone integrado à rede.
+        :type backbone_name: str
+        :param trainDS: Conjunto de dados de treino após o data augmentation.
+        :type trainDS: tensorflow.python.data.ops.dataset_ops.PrefetchDataset
+        :param val_DS: Conjunto de dados de validação após o data augmentation.
+        :type val_DS: tensorflow.python.data.ops.dataset_ops.PrefetchDataset
+        :param epochs: Número de épocas.
+        :type epochs: int
+        :param callback: Callback do TensorFlow.
+        :type callback: tensorflow.keras.callbacks
+
+        '''
         self.N = N
         self.backbone_name = backbone_name
         self.trainDS, self.valDS = trainDS, valDS
@@ -183,6 +290,15 @@ class SegmentationModel:
         self.model, self.history = self.generate_model()
 
     def generate_model(self):
+
+        '''
+        Gera o modelo.
+        Alimenta os atributos model e history.
+
+        :return: Modelo e History
+        :rtype: keras.engine.functional.Functional, keras.callbacks.History
+        '''
+
         model = Linknet(backbone_name=self.backbone_name, encoder_weights=None,
                     input_shape=(None,None,self.N))
 
@@ -205,7 +321,27 @@ class SegmentationModel:
 
     
 class SaveReport:
-    def __init__(self, model, history, folder_name, n_fold,epochs, exec_folder_name, use_batch_size=4):
+    def __init__(self, model, history, folder_name:str, n_fold:int,epochs:int, exec_folder_name:str, use_batch_size=4):
+        '''
+        Construtor da classe SaveReport.
+        Salva o modelo.
+
+        :param model: Modelo.
+        :type model: keras.engine.functional.Functional
+        :param history: History com report do treinamento.
+        :type history: keras.callbacks.History
+        :param folder_name: Diretório onde será armazenado o output.
+        :type folder_name: str
+        :param n_fold: Número da execução.
+        :type n_fold: int
+        :param epochs: Número de épocas.
+        :type epochs: int
+        :param exec_folder_name: Diretório do conjunto atual de execuções. [Ex.: Exec_2023-05-04-20-30-56.952912]
+        :type exec_folder_name: str
+        :param use_batch_size: Tamanho do pacote (batch-size).
+        :type use_batch_size: int
+
+        '''
         self.folder_name = folder_name
         self.n_fold = n_fold
         self.epochs = epochs
