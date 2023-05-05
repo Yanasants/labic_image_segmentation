@@ -27,6 +27,7 @@ import plotly.graph_objects as go
 
 from sklearn.model_selection import train_test_split
 
+from unet_original import UnetOriginal
 from segmentation_models import Unet, Linknet
 from segmentation_models.losses import bce_jaccard_loss
 from segmentation_models.metrics import iou_score
@@ -257,8 +258,9 @@ class DataAugmentation:
 
 
 class SegmentationModel:
-    def __init__(self, N:int, segmentation_model:str, backbone_name:str, trainDS, valDS, epochs:int, callback=None):
-        # falta adicionar o segmentation_model como parâmetro
+    def __init__(self, N:int, segmentation_model:str, backbone_name:str, trainDS, valDS, epochs:int, callback=None, input_layer_shape=None):
+        # falta adicionar o segmentation_model como parâmetro 
+        # falta add o input_layer_shape
         '''
         Construtor da classe SegmentationModel.
         Após a inicialização, teremos:
@@ -281,6 +283,7 @@ class SegmentationModel:
         '''
         self.N = N
         self.backbone_name = backbone_name
+        self.input_layer_shape = input_layer_shape
         self.trainDS, self.valDS = trainDS, valDS
         self.epochs = epochs
         self.callback = callback
@@ -304,6 +307,9 @@ class SegmentationModel:
         if self.segmentation_model=='unet':
             model = Unet(backbone_name=self.backbone_name, encoder_weights=None,
                     input_shape=(None,None,self.N))
+        if self.segmentation_model=='unet_original':
+            unet_original = UnetOriginal(input_layer_shape=self.input_layer_shape)
+            model = unet_original.generate_model()
 
 
         model.compile(optimizer=Adam(), loss=bce_jaccard_loss, metrics=[iou_score]) 
