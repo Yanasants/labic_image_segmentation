@@ -355,15 +355,30 @@ class SaveReport:
 
         
     def create_folder(self, dirName):
-            # Create target Directory if don't exist
-            if not os.path.exists(dirName):
-                os.mkdir(dirName)
-                print("Diretorio " , dirName ,  " Criado ")
-            else:    
-                print("Diretorio " , dirName ,  " ja existe")
+        '''
+        Cria o diretório se não existir.
+
+        :param dirName: Nome do diretório a ser criado.
+        :type dirName: str
+        '''
+        # Create target Directory if don't exist
+        if not os.path.exists(dirName):
+            os.mkdir(dirName)
+            print("Diretório " , dirName ,  " criado.")
+        else:    
+            print("Diretório " , dirName ,  " já existe.")
     
     def organize_folders(self):
+        '''
+        Organiza os diretórios.
+        Dentro do output_folder haverá (ou será criada) a pasta outputs.
+        Dentro da pasta outputs, por sua vez, estarão os diretórios do conjunto de execuções (por padrão, iniciados com Exec_).
+        Dentro de cada pasta de execução, estarão os diretórios de cada n execução.
+        [Ex. Path: output_folder/outputs/Exec_folder/fold_n]
 
+        :return: Momento da execução, path da pasta da execução de número n, path da pasta do conjunto de execuções.
+        :rtype: str, str, str
+        '''
         if (self.n_fold == 0):
             exec_moment = str(datetime.datetime.now()).replace(':','-').replace(' ','-') 
             self.output_folder = f"/outputs/Exec_{exec_moment}"
@@ -380,6 +395,10 @@ class SaveReport:
         return exec_moment, n_fold_folder_name, self.exec_folder_name
     
     def save_model(self):
+        '''
+        Alimenta o atributo n_fold_folder_name, organiza as pastas chamando a função organize_folders.
+        Salva o modelo no arquivo .h5.
+        '''
         exec_moment, self.n_fold_folder_name, exec_folder_name = self.organize_folders()
         self.name_file = "model_"+ str(self.use_batch_size) + "_" + str(self.epochs) + "_exec_%s"%(exec_moment) + "_fold_%i"%self.n_fold
         self.model_name = self.n_fold_folder_name + '/%s.h5'%self.name_file
@@ -387,6 +406,11 @@ class SaveReport:
         print(f"\nModelo salvo.\nNome: {self.name_file}\nSalvo em: {exec_folder_name}")
 
     def save_history(self):
+        '''
+        Salva o history do treinamento em formato .csv e .txt
+        O arquivo .txt necessário pois, apesar do formato .csv facilitar o carregamento de dados a posteriori,
+        o armazenamento neste pode ter falhas de caracteres, sobretudo em valores muito altos na Loss.
+        '''
         with open(f"{self.n_fold_folder_name}/history_{self.n_fold}.txt", "w") as file:
             file.write(str(self.history.history))
 
@@ -396,7 +420,23 @@ class SaveReport:
         
 
 class PredictImages:
-    def __init__(self, test_images, n_fold_folder_name, model_name, use_batch_size, img_shape):
+    def __init__(self, test_images, n_fold_folder_name:str, model_name:str, use_batch_size:int, img_shape:tuple):
+        '''
+        Construtor da classe PredictImages.
+        Chama a função predict para predição das imagens de teste.
+
+        :param test_images: Imagens de teste.
+        :type test_images: labic_images_segmentation.Dataset
+        :param n_fold_folder_name: Path para o diretório da execução n. [Ex.: ./TM40_46Prod/outputs/Exec_2023-05-04-20-30-56.952912/fold_0]
+        :type n_fold_folder_name: str
+        :param model_name: Path para o arquivo com o modelo. [Ex.: ./TM40_46Prod/outputs/Exec_2023-05-04-20-30-56.952912/fold_0/model_4_3_exec_2023-05-04-20-30-56.952912_fold_0.h5]
+        :type model_name: str
+        :param use_batch_size: Tamanho do pacote (batch-size).
+        :type use_batch_size: int
+        :param img_shape: Altura e largura das imagens originais.
+        :type img_shape: tuple
+
+        '''
         self.test_images = test_images
         self.model_name = model_name
         self.n_fold_folder_name = n_fold_folder_name
@@ -409,6 +449,10 @@ class PredictImages:
         self.predict()
 
     def predict(self):
+        '''
+        Carrega o modelo, cria o diretório outputs_prod dentro da pasta da execução n. 
+        Realiza e salva as predições, redimensionando as images no momento de salvar.
+        '''
         model = keras.models.load_model(self.model_name, compile=False)
         self.new_predicao = model.predict(self.test_images.X)
         self.new_predicao = np.uint8(255*(self.new_predicao > 0.5))
@@ -422,7 +466,22 @@ class PredictImages:
 
 
 class DiceCoef(Dataset):
-    def __init__(self, gt_imgs, pred_folder, new_size):
+    def __init__(self, gt_imgs:np.ndarray, pred_folder:str, new_size:int):
+        '''
+        Construtor da classe DiceCoef.
+        Após a inicialização, teremos:
+            - No atributo pred_imgs: Imagens de teste (em formato np.ndarray);
+            - No atributo img_shape: Tupla com dimensões das imagens;
+            - No atributo dice: Valor do dice entre máscaras de teste e predições.
+
+        :param gt_imgs: Máscaras de teste.
+        :type test_images: numpy.ndarray
+        :param pred_folder: Path para o diretório outputs_prod da execução n, onde estão salvas as predições.
+        :type pred_folder: str
+        :param new_size: Novo size das imagens.
+        :type new_size: int
+
+        '''
         self.gt_imgs = gt_imgs
         self.pred_folder = pred_folder
         self.new_size = new_size
@@ -434,18 +493,46 @@ class DiceCoef(Dataset):
         print(f"Coeficiente Dice: {self.dice}")
         self.df = None
 
-    def dice_coef(self, y_true, y_pred):
+    def dice_coef(self, y_true:np.ndarray, y_pred:np.ndarray):
+        '''
+        Calcula o dice entre as máscaras de teste e as predições.
+
+        :param y_true: Máscaras das imagens de teste.
+        :type y_true: numpy.ndarray
+        :param y_pred: Predições do modelo.
+        :type y_pred: numpy.ndarray
+
+        :return: Coeficiente Dice
+        :rtype: float
+        '''
         y_true_f = keras.backend.flatten(y_true) 
         y_pred_f = keras.backend.flatten(y_pred) 
         intersection = keras.backend.sum(y_true_f * y_pred_f)
         return (2. * intersection + \
             keras.backend.epsilon()) / (keras.backend.sum(y_true_f) + keras.backend.sum(y_pred_f) + keras.backend.epsilon())  
     
-    def save_dice(self, adress):
+    def save_dice(self, adress:str):
+        '''
+        Salva o valor do dice na pasta da execução n.
+
+        :param adress: Path para arquivo .txt do dice.
+        :type adress: str
+        '''
         with open(adress, "w") as file:
             file.write(f"Dice: {self.dice}")
 
-    def generate_csv_dice(self, n_all_folders, save_report, title):
+    def generate_csv_dice(self, n_all_folders:int, save_report, title:str):
+        '''
+        Cria um arquivo .csv no diretório do conjunto de execuções com o valor de todos os dices dos n_folds.
+        Alimenta o atributo df com os mesmos dados do csv.
+
+        :param n_all_folders: Número total de execuções no conjunto.
+        :type n_all_folders: int
+        :param save_report: Objeto da classe SaveReport para organização dos arquivos e diretórios.
+        :type save_report: labic_images_segmentation.SaveReport
+        :param title: Título do arquivo .csv. Recomenda-se indicar modelo, backbone, entre outras informações relevantes.
+        :type title: str
+        '''
         all_dice = []
         for i in range(n_all_folders+1):
             with open(f"{save_report.exec_folder_name}/fold_{i}/dice_fold_{i}.txt", "r") as file:
@@ -459,8 +546,20 @@ class DiceCoef(Dataset):
         self.df.to_csv(f"{save_report.exec_folder_name}/{title}.csv")
         print(f"Arquivo {title}.csv gerado com sucesso.")
 
-    def generate_graphic(self, epochs, segment, save_report, graph_type):
-        if graph_type=="iou_score":
+    def generate_graphic(self, epochs:int, segment, save_report, graphic_type:str):
+        '''
+        Gera os gráficos com dados do History. Armazena as imagens em formato png.
+        
+        :param epochs: Número de épocas.
+        :type epochs: int
+        :param segment: Objeto da classe SegmentationModel.
+        :type segment: labic_images_segmentation.SegmentationModel
+        :param save_report: Objeto da classe SaveReport.
+        :type save_report: labic_images_segmentation.SaveReport
+        :param graphic_type: Tipo do gráfico ("iou_score" ou "loss").
+        :type graphic_type: str
+        '''
+        if graphic_type=="iou_score":
             fig = go.Figure()
             fig.add_trace(go.Scatter(x = [epoch for epoch in range(epochs)], y = segment.history.history['val_iou_score'],
                         mode = 'lines', name = "Validation Iou Score", line = {'color': '#00AD5A'}))
@@ -473,7 +572,7 @@ class DiceCoef(Dataset):
             fig.show()
             fig.write_image(f"{save_report.n_fold_folder_name}/iou_score_report.png")
 
-        if graph_type=="loss":
+        if graphic_type=="loss":
             fig = go.Figure()
             fig.add_trace(go.Scatter(x = [epoch for epoch in range(epochs)], y = segment.history.history['loss'],
                             mode = 'lines', name = "Train Loss", line = {'color': '#D65200'}))
