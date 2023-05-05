@@ -1,5 +1,19 @@
 from segmentation_models import Unet, Linknet
-def labic_init():
+import json
+
+with open("config.json", "r") as params:
+    config = json.load(params)
+
+def labic_init(config=config):
     print("Inicializando...")
-    model = Linknet(backbone_name='resnet34', encoder_weights=None,
-                  input_shape=(None,None,3))
+    backbone = config["backbone_name"]
+    if config["model"] == "linknet":
+        model = Linknet(backbone_name=config["backbone_name"], encoder_weights=None,
+                    input_shape=(None,None,3))
+        print(f"Segmentação com modelo Linknet_{backbone} inicializada com sucesso.")
+    elif config["model"] == "unet":
+        model = Unet(backbone_name=config["backbone_name"], encoder_weights=None,
+                    input_shape=(None,None,3))
+        print(f"Segmentação com modelo Unet_{backbone} inicializada com sucesso.")
+    else:
+        raise ValueError("Modelo inválido! Revise o arquivo config.json")
