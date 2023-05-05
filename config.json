@@ -10,9 +10,13 @@
     "NEW_SIZE" : 256,
     "batch_size" : 4,
     "epochs" : 3,
-    "callback" : null,
     "exec_folder_name" : "",
     "title" : "Linknet_resnet34",
     "model" : "linknet",
-    "backbone_name" : "resnet34"
+    "backbone_name" : "resnet34",
+    "callback" : "early_stopping",
+    "monitor" : "val_loss",
+    "verbose" : 0,
+    "mode" : "min",
+    "patience" : 10
 }
