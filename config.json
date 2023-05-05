@@ -1,0 +1,18 @@
+{
+    "n_fold" : 0,
+    "dataset_folder" : "./TM40_Original",
+    "norm_imgs_folder" : "/Norm_images/*",
+    "gt_folder" : "/GT_images/*",
+    "output_folder" : "./TM40_46Prod",
+    "test_imgs_folder" : "/Producao/*",
+    "gt_test_folder" : "/GT_Producao/*",
+    "ORIGINAL_SIZE" : 512,
+    "NEW_SIZE" : 256,
+    "batch_size" : 4,
+    "epochs" : 3,
+    "callback" : null,
+    "exec_folder_name" : "",
+    "title" : "Linknet_resnet34",
+    "model" : "linknet",
+    "backbone_name" : "resnet34"
+}

@@ -205,7 +205,6 @@ class DataAugmentation:
         '''
 
         self.trainAug = Sequential([
-            #preprocessing.Rescaling(scale=1.0 / 255),
             preprocessing.RandomFlip(self.direction),
             preprocessing.RandomZoom(
                 height_factor=(-self.factor, +self.factor),
@@ -214,7 +213,6 @@ class DataAugmentation:
         ])
 
         self.valAug = Sequential([
-            #preprocessing.Rescaling(scale=1.0 / 255),
             preprocessing.RandomFlip(self.direction),
             preprocessing.RandomZoom(
                 height_factor=(-self.factor, +self.factor),
@@ -259,7 +257,8 @@ class DataAugmentation:
 
 
 class SegmentationModel:
-    def __init__(self, N:int, backbone_name:str, trainDS, valDS, epochs:int, callback=None):
+    def __init__(self, N:int, segmentation_model:str, backbone_name:str, trainDS, valDS, epochs:int, callback=None):
+        # falta adicionar o segmentation_model como parâmetro
         '''
         Construtor da classe SegmentationModel.
         Após a inicialização, teremos:
@@ -287,6 +286,7 @@ class SegmentationModel:
         self.callback = callback
         self.model = None
         self.history = None
+        self.segmentation_model = segmentation_model
         self.model, self.history = self.generate_model()
 
     def generate_model(self):
@@ -298,8 +298,11 @@ class SegmentationModel:
         :return: Modelo e History
         :rtype: keras.engine.functional.Functional, keras.callbacks.History
         '''
-
-        model = Linknet(backbone_name=self.backbone_name, encoder_weights=None,
+        if self.segmentation_model=='linknet':
+            model = Linknet(backbone_name=self.backbone_name, encoder_weights=None,
+                        input_shape=(None,None,self.N))
+        if self.segmentation_model=='unet':
+            model = Unet(backbone_name=self.backbone_name, encoder_weights=None,
                     input_shape=(None,None,self.N))
 
 
@@ -352,6 +355,7 @@ class SaveReport:
         self.dir_predict = None
         self.exec_folder_name = exec_folder_name
         self.save_model()
+        self.save_history()
 
         
     def create_folder(self, dirName):
