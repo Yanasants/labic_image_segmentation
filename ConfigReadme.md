@@ -1,4 +1,4 @@
-### Config.json - Arquivos de parâmetros
+### Config.json - Arquivo de parâmetros
 
 * __n_fold__: Número da execução;
 * __dataset_folder__: Diretório com dados de treino;
