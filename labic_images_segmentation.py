@@ -14,7 +14,6 @@ from tensorflow import keras
 
 import tensorflow as tf
 
-#from keras.callbacks.callbacks import EarlyStopping
 from keras.preprocessing.image import ImageDataGenerator
 
 import numpy as np
@@ -38,14 +37,18 @@ from tensorflow.keras.layers.experimental import preprocessing
 from tensorflow.data import AUTOTUNE
 from tensorflow.keras.optimizers import Adam
 
+'''
+Classe Dataset
+'''
 class Dataset:
+    '''
+    A classe Dataset contém todos os processos vinculados ao carregamento e separação dos dados.
+    Após a inicialização, teremos:
+        - No atributo X: todas as imagens;
+        - No atributo Y: todas as máscaras;
+    '''
     def __init__(self, folder:str, norm_imgs_folder:str, gt_folder:str, ORIGINAL_SIZE=None, NEW_SIZE=None):
         '''
-        Construtor da classe Dataset.
-        Após a inicialização, teremos:
-            - No atributo X: todas as imagens;
-            - No atributo Y: todas as máscaras;
-
         :param folder: Diretório onde se encontra os subdiretórios com imagens e com as máscaras.
         :type folder: str
         :param norm_imgs_folder: Subdiretório com as imagens.
@@ -82,25 +85,22 @@ class Dataset:
         :type width: int
         :return: Imagem redimensionada.
         :rtype: numpy.ndarray
-
         '''
         self.curr_img = cv2.resize(img, (width, height))
         return self.curr_img
         
     def load_images_array(self, img_list:list, original_size=160, new_size = None):
-
         '''
         Recebe um glob das imagens e converte em um numpy array no formato que o Keras aceita.
 
         :param img_list: Lista com todos os nomes das imagens no diretório. 
         :type img_list: list
-        :param new_size: Novo size da imagem (equivalendo para largura e altura).
+        :param new_size: Novo size da imagem (largura e altura).
         :type new_size: int
 
         :return: Conjunto de imagens no formato de input do Keras [(exemplo formato Keras: (5, 256, 256, 1)] 
         e uma tupla com a altura e a largura, respectivamente, da imagem original.
         :rtype: tuple
-
         '''
         img = np.zeros((len(img_list), new_size, new_size), dtype=float)
         img_shape = img_as_float(io.imread(img_list[0])).shape
@@ -115,12 +115,10 @@ class Dataset:
         return img, img_shape
         
     def load_images(self):
-
         '''
         Organiza a lista das imagens no diretório e chama a função load_images_array para alimentar 
         os atributos X, Y e img_shape da classe.        
         '''
-
         self.norm_imgs = sorted(glob.glob(f"{self.folder}{self.norm_imgs_folder}")) 
         self.GT_imgs = sorted(glob.glob(f"{self.folder}{self.gt_folder}")) 
                                         
@@ -133,7 +131,6 @@ class Dataset:
         print("\nImagens carregadas com sucesso.")
     
     def split_dataset(self, seed_min=0, seed_max =2**20, test_size=0.2):
-
         '''
         Separa as imagens e as máscaras de treino e validação.
         Alimenta os atributos X_train, Y_train, X_val e Y_val.
@@ -144,7 +141,6 @@ class Dataset:
         :type seed_max: int
         :param test_size: Tamanho do conjunto de teste [Valores entre 0 e 1. Ex.: 0.2 = 20% do total dos dados para teste]. 
         :type test_size: float
-
         '''
 
         random.seed(time.time())
@@ -154,16 +150,18 @@ class Dataset:
         print(f"\nDataset subdividido.\n{test_size*100}% dos dados para validação.\n{(1-test_size)*100}% dos dados para treino.")
                 
         
-    
+'''
+Classe DataAugmentation
+'''
 class DataAugmentation:
+    '''
+    A classe contém todas as funções necessárias para o processo de Data Augmentation.
+        - No atributo trainDS: dados de treino após o processo de data augmentation;
+        - No atributo valDS: dados de validação após o processo de data augmentation;
+    '''
     def __init__(self, X_train:np.ndarray, Y_train:np.ndarray, use_batch_size:int, X_val:np.ndarray, \
                  Y_val:np.ndarray, factor=0.2, direction="horizontal", rotation=0.1):
         '''
-        Construtor da classe DataAugmentation.
-        Após a inicialização, teremos:
-            - No atributo trainDS: dados de treino após o processo de data augmentation;
-            - No atributo valDS: dados de validação após o processo de data augmentation;;
-
         :param X_train: Imagens de treino.
         :type X_train: numpy.ndarray
         :param Y_train: Máscaras de treino.
@@ -182,7 +180,6 @@ class DataAugmentation:
         :type direction: str
         :param rotation: Ângulo de rotação das imagens no data augmentation.
         :type rotation: int
-
         '''
         self.trainAug = None
         self.valAug = None
@@ -203,6 +200,9 @@ class DataAugmentation:
 
         '''
         Aplica o processo de data augmentation de acordo com os parâmetros repassados.
+
+        :return: Retorna os dados de treino e validação após o Data Augmentation.
+        :rtype: 
         '''
 
         self.trainAug = Sequential([
@@ -256,19 +256,21 @@ class DataAugmentation:
         return self.trainDS, self.valDS
 
 
-
+'''
+Classe SegmentationModel
+'''
 class SegmentationModel:
+    '''
+    Após a inicialização, teremos:
+        - No atributo model: Modelo da rede;
+        - No atributo history: Report do treinamento;
+    '''
     def __init__(self, N:int, segmentation_model:str, backbone_name:str, trainDS, valDS, epochs:int, callback=None, input_layer_shape=None):
-        # falta adicionar o segmentation_model como parâmetro 
-        # falta add o input_layer_shape
         '''
-        Construtor da classe SegmentationModel.
-        Após a inicialização, teremos:
-            - No atributo model: Modelo da rede;
-            - No atributo history: Report do treinamento;
-
         :param N: Número de canais (precisa ser 3 ser enconder_weights != None).
         :type N: int
+        :param segmentation_model: Modelo a ser escolhido. ['unet', 'unet_original', 'linknet'].
+        :type segmentation_model: string
         :param backbone_name: Backbone integrado à rede.
         :type backbone_name: str
         :param trainDS: Conjunto de dados de treino após o data augmentation.
@@ -279,6 +281,8 @@ class SegmentationModel:
         :type epochs: int
         :param callback: Callback do TensorFlow.
         :type callback: tensorflow.keras.callbacks
+        :param input_layer_shape: Shape dos dados de input.
+        :type input_layer_shape: tuple
 
         '''
         self.N = N
@@ -328,13 +332,15 @@ class SegmentationModel:
 
 
 
-    
+'''
+Classe SaveReport
+'''
 class SaveReport:
+    '''
+    Salva o modelo e o history (report).
+    '''
     def __init__(self, model, history, folder_name:str, n_fold:int,epochs:int, exec_folder_name:str, use_batch_size=4):
         '''
-        Construtor da classe SaveReport.
-        Salva o modelo.
-
         :param model: Modelo.
         :type model: keras.engine.functional.Functional
         :param history: History com report do treinamento.
@@ -345,7 +351,7 @@ class SaveReport:
         :type n_fold: int
         :param epochs: Número de épocas.
         :type epochs: int
-        :param exec_folder_name: Diretório do conjunto atual de execuções. [Ex.: Exec_2023-05-04-20-30-56.952912]
+        :param exec_folder_name: Diretório do conjunto atual de execuções. [Ex.: Exec_2023-05-04-20-30-56.952912].
         :type exec_folder_name: str
         :param use_batch_size: Tamanho do pacote (batch-size).
         :type use_batch_size: int
@@ -428,24 +434,25 @@ class SaveReport:
         df.to_csv(f"{self.n_fold_folder_name}/history_{self.n_fold}.csv")
         print(f"Arquivos history_{self.n_fold}.csv/txt salvos com sucesso.")
         
-
+'''
+Classe PredictImages
+'''
 class PredictImages:
+    '''
+    Carrega os dados de teste e realiza a predição. 
+    '''
     def __init__(self, test_images, n_fold_folder_name:str, model_name:str, use_batch_size:int, img_shape:tuple):
         '''
-        Construtor da classe PredictImages.
-        Chama a função predict para predição das imagens de teste.
-
         :param test_images: Imagens de teste.
         :type test_images: labic_images_segmentation.Dataset
-        :param n_fold_folder_name: Path para o diretório da execução n. [Ex.: ./TM40_46Prod/outputs/Exec_2023-05-04-20-30-56.952912/fold_0]
+        :param n_fold_folder_name: Path para o diretório da execução n. [Ex.: ./TM40_46Prod/outputs/Exec_2023-05-04-20-30-56.952912/fold_0].
         :type n_fold_folder_name: str
-        :param model_name: Path para o arquivo com o modelo. [Ex.: ./TM40_46Prod/outputs/Exec_2023-05-04-20-30-56.952912/fold_0/model_4_3_exec_2023-05-04-20-30-56.952912_fold_0.h5]
+        :param model_name: Path para o arquivo com o modelo. [Ex.: ./TM40_46Prod/outputs/Exec_2023-05-04-20-30-56.952912/fold_0/model_4_3_exec_2023-05-04-20-30-56.952912_fold_0.h5].
         :type model_name: str
         :param use_batch_size: Tamanho do pacote (batch-size).
         :type use_batch_size: int
         :param img_shape: Altura e largura das imagens originais.
         :type img_shape: tuple
-
         '''
         self.test_images = test_images
         self.model_name = model_name
@@ -474,16 +481,18 @@ class PredictImages:
         
         print("\nImagens preditas com sucesso.")
 
-
+'''
+Classe DiceCoef
+'''
 class DiceCoef(Dataset):
+    '''
+    Após a inicialização, teremos:
+        - No atributo pred_imgs: Imagens de teste (em formato np.ndarray);
+        - No atributo img_shape: Tupla com dimensões das imagens;
+        - No atributo dice: Valor do dice entre máscaras de teste e predições.
+    '''
     def __init__(self, gt_imgs:np.ndarray, pred_folder:str, new_size:int):
         '''
-        Construtor da classe DiceCoef.
-        Após a inicialização, teremos:
-            - No atributo pred_imgs: Imagens de teste (em formato np.ndarray);
-            - No atributo img_shape: Tupla com dimensões das imagens;
-            - No atributo dice: Valor do dice entre máscaras de teste e predições.
-
         :param gt_imgs: Máscaras de teste.
         :type test_images: numpy.ndarray
         :param pred_folder: Path para o diretório outputs_prod da execução n, onde estão salvas as predições.
