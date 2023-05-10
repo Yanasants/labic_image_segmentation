@@ -7,7 +7,7 @@ Labic Images Segmentation
 =====================================================
 
 .. toctree::
-   :caption: Módulo 
+   :caption: Titulo teste
    :titlesonly:
 
    codigo
