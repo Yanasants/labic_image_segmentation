@@ -90,7 +90,7 @@ class Dataset:
         self.curr_img = cv2.resize(img, (width, height))
         return self.curr_img
         
-    def load_images_array(self, img_list:list, original_size=160, new_size = None, normalize=False):
+    def load_images_array(self, img_list:list, original_size=160, new_size = None, normalize=0):
         '''
         Recebe um glob das imagens e converte em um numpy array no formato que o Keras aceita.
 
