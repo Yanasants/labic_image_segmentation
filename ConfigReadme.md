@@ -9,6 +9,7 @@
 * __gt_test_folder__: Subdiretório com máscaras de teste;
 * __ORIGINAL_SIZE__: Size (em pixels) original das imagens;
 * __NEW_SIZE__: Novo size (em pixels) das imagens redimensionadas;
+* __normalize__: Normalização das imagens com aumento de contraste. Deve ser setado o valor 1 para normalizar;
 * __batch_size__: Tamanho do lote (batch-size);
 * __epochs__: Número de épocas;
 * __exec_folder_name__: Diretório do conjunto de execuções. [_Ex.:Exec_2023-05-09-11-38-45.654295_];
