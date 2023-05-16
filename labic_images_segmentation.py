@@ -4,7 +4,7 @@ Created on Fri Apr 14 19:04:14 2023
 
 @author: Labic
 """
-from skimage import io
+from skimage import io, exposure
 import cv2
 import os
 
@@ -47,7 +47,7 @@ class Dataset:
         - No atributo X: todas as imagens;
         - No atributo Y: todas as máscaras;
     '''
-    def __init__(self, folder:str, norm_imgs_folder:str, gt_folder:str, ORIGINAL_SIZE=None, NEW_SIZE=None):
+    def __init__(self, folder:str, norm_imgs_folder:str, gt_folder:str, ORIGINAL_SIZE=None, NEW_SIZE=None, normalize=False):
         '''
         :param folder: Diretório onde se encontra os subdiretórios com imagens e com as máscaras.
         :type folder: str
@@ -66,6 +66,7 @@ class Dataset:
         self.gt_folder = gt_folder
         self.ORIGINAL_SIZE = ORIGINAL_SIZE
         self.NEW_SIZE = NEW_SIZE
+        self.normalize = normalize
         self.X = None
         self.Y = None
         self.X_train, self.X_val, self.Y_train, self.Y_val = (None, None, None, None)
@@ -89,7 +90,7 @@ class Dataset:
         self.curr_img = cv2.resize(img, (width, height))
         return self.curr_img
         
-    def load_images_array(self, img_list:list, original_size=160, new_size = None):
+    def load_images_array(self, img_list:list, original_size=160, new_size = None, normalize=False):
         '''
         Recebe um glob das imagens e converte em um numpy array no formato que o Keras aceita.
 
@@ -111,9 +112,18 @@ class Dataset:
             img[i] = im
     
         # Padrão Keras
+        if normalize == 1:
+            img = np.float64(img)
+            img = self.normalize_contr_stretching(img)
         img = img.reshape(-1, img.shape[-2], img.shape[-1], 1)
         return img, img_shape
-        
+    
+    def normalize_contr_stretching(self, imgs):
+        # Contrast stretching
+        p5, p95 = np.percentile(imgs, (5,95))
+        imgs = exposure.rescale_intensity(imgs, in_range=(p5,p95))
+        return imgs
+    
     def load_images(self):
         '''
         Organiza a lista das imagens no diretório e chama a função load_images_array para alimentar 
@@ -126,8 +136,8 @@ class Dataset:
             if self.norm_imgs[i][-8:-4] != self.GT_imgs[i][-8:-4]:
                 print('Algo está errado com as imagens')
 
-        self.X, self.img_shape = self.load_images_array(img_list=self.norm_imgs, original_size=self.ORIGINAL_SIZE, new_size = self.NEW_SIZE)
-        self.Y, self.img_shape = self.load_images_array(img_list=self.GT_imgs, original_size=self.ORIGINAL_SIZE, new_size = self.NEW_SIZE)
+        self.X, self.img_shape = self.load_images_array(img_list=self.norm_imgs, original_size=self.ORIGINAL_SIZE, new_size = self.NEW_SIZE, normalize = self.normalize)
+        self.Y, self.img_shape = self.load_images_array(img_list=self.GT_imgs, original_size=self.ORIGINAL_SIZE, new_size = self.NEW_SIZE, normalize = self.normalize)
         print("\nImagens carregadas com sucesso.")
     
     def split_dataset(self, seed_min=0, seed_max =2**20, test_size=0.2):
